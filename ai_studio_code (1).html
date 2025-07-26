@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Shopping List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- jsPDF Library for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- CSS Styles -->
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --panel-color: #ffffff;
+            --text-color: #333;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        header h1 { margin: 0; }
+        #last-updated { font-size: 0.9em; color: #666; }
+
+        .panel {
+            background-color: var(--panel-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-group, .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover { background-color: var(--accent-hover); }
+
+        .input-group { display: flex; gap: 10px; }
+        .input-group input { flex-grow: 1; }
+        .input-group button, .input-group select { flex-shrink: 0; }
+        .input-group select { width: auto; }
+        
+        .settings-grid, .list-management-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        #item-list { list-style: none; padding: 0; margin: 0; }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .item-info { flex-grow: 1; min-width: 200px;}
+        .item-name { font-size: 1.1em; font-weight: 600; }
+        .item-price-breakdown { font-size: 0.85em; color: #555; margin-top: 4px; }
+        .item-price { font-size: 1.1em; font-weight: 600; }
+        .item-actions button { margin-left: 5px; padding: 5px 10px; font-size: 0.9em; }
+        
+        .purchase-btn { background-color: var(--success-color); }
+        .purchase-btn:hover { background-color: #218838; }
+        .delete-btn { background-color: var(--danger-color); }
+        .delete-btn:hover { background-color: #c82333; }
+        .calc-btn { background-color: #6c757d; }
+        .calc-btn:hover { background-color: #5a6268; }
+
+        .list-item.purchased .item-name { text-decoration: line-through; color: #888; }
+
+        .summary-details p {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+        .summary-details p:not(:first-child) { font-size: 1em; }
+        .summary-details p span { font-weight: 400; }
+        .summary-details p:last-of-type { font-weight: 600; }
+        .summary-details p.grand-total { font-size: 1.2em; font-weight: 600; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
+        #money-left.due { color: var(--danger-color); font-weight: 600; }
+        #money-left.left { color: var(--success-color); font-weight: 600; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; padding: 20px; box-sizing: border-box;
+            overflow-y: auto;
+        }
+        .modal-content {
+            background-color: white; padding: 30px; border-radius: 8px;
+            width: 100%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 { margin-top: 0; }
+        
+        .calc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .calc-grid .form-group { margin-bottom: 0; }
+        .calc-grid .full-width { grid-column: span 2; }
+        .calc-grid .half-width { grid-column: span 1; }
+
+        .calc-result {
+            margin: 20px 0; padding: 10px; background-color: var(--bg-color);
+            border-radius: 4px; text-align: center; font-weight: 600;
+        }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Shopping List</h1>
+            <p id="last-updated">Last updated: Never</p>
+        </header>
+
+        <div class="panel">
+            <h2>Manage Lists</h2>
+            <div class="list-management-grid">
+                <div class="form-group">
+                    <label for="list-selector">Current List</label>
+                    <select id="list-selector"></select>
+                </div>
+                <div class="input-group">
+                    <button id="rename-list-btn">Rename</button>
+                    <button id="delete-list-btn" class="delete-btn">Delete</button>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="new-list-name" placeholder="New list name">
+                    <button id="add-list-btn">Create List</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel settings-panel">
+            <h2>Global Settings</h2>
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label for="total-cash">Cash on Hand</label>
+                    <input type="number" id="total-cash" placeholder="e.g., 1000">
+                </div>
+                <div class="form-group">
+                    <label for="currency">Currency</label>
+                    <select id="currency">
+                        <option value="₹">₹ (INR)</option>
+                        <option value="$">$ (USD)</option>
+                        <option value="€">€ (EUR)</option>
+                        <option value="£">£ (GBP)</option>
+                        <option value="¥">¥ (JPY)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel add-item-panel">
+            <h2 id="current-list-title"></h2>
+            <form id="add-item-form" class="input-group">
+                <input type="text" id="item-name" placeholder="e.g., Apples" required>
+                <button type="submit">Add Item</button>
+            </form>
+            <ul id="item-list"></ul>
+        </div>
+        
+        <div class="panel adjustments-panel">
+            <h2>Bill Adjustments for this List</h2>
+            <div class="settings-grid">
+                <div class="form-group input-group">
+                    <label for="tax-value">Tax</label>
+                    <input type="number" id="tax-value" placeholder="Tax value">
+                    <select id="tax-type">
+                        <option value="percent">%</option>
+                        <option value="fixed">Fixed</option>
+                    </select>
+                </div>
+                <div class="form-group input-group">
+                    <label for="discount-value">Global Discount</label>
+                    <input type="number" id="discount-value" placeholder="Discount value">
+                    <select id="discount-type">
+                        <option value="percent">%</option>
+                        <option value="fixed">Fixed</option>
+                    </select>
+                </div>
+                <div class="form-group input-group">
+                     <label for="tip-value">Global Tip</label>
+                    <input type="number" id="tip-value" placeholder="Tip value">
+                    <select id="tip-type">
+                        <option value="percent">%</option>
+                        <option value="fixed">Fixed</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel summary-panel">
+            <h2>Summary for this List</h2>
+            <div class="summary-details">
+                <p>Subtotal: <span id="summary-subtotal">0.00</span></p>
+                <p>Discounts: <span id="summary-discounts">- 0.00</span></p>
+                <p>Subtotal after Discounts: <span id="summary-subtotal-after-discounts">0.00</span></p>
+                <p>Tax: <span id="summary-tax">+ 0.00</span></p>
+                <p>Item Tips: <span id="summary-item-tips">+ 0.00</span></p>
+                <p>Global Tip: <span id="summary-global-tip">+ 0.00</span></p>
+                <p class="grand-total">Grand Total: <span id="total-spent">0.00</span></p>
+                <p>Money Left / Due: <span id="money-left">0.00</span></p>
+            </div>
+            <button id="print-bill-btn" style="margin-top: 20px; width: 100%;">Print Bill (PDF)</button>
+        </div>
+    </div>
+
+    <!-- Calculation Helper Modal -->
+    <div id="calc-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Smart Calculation Helper</h3>
+            <p>For item: <strong id="calc-item-name"></strong></p>
+            
+            <div class="calc-grid">
+                <div class="form-group full-width">
+                    <label for="calc-category">Category of Item</label>
+                    <select id="calc-category">
+                        <option value="mass">Mass (kg, g, lb, oz)</option>
+                        <option value="volume">Volume (L, ml, gal)</option>
+                        <option value="length">Length (m, cm, ft, in)</option>
+                        <option value="pieces">Pieces (single items)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group half-width">
+                    <label for="price-per-unit">Price</label>
+                    <input type="number" id="price-per-unit" placeholder="e.g., 200">
+                </div>
+                <div class="form-group half-width">
+                    <label for="price-unit-select">Per Unit</label>
+                    <select id="price-unit-select"></select>
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="quantity">Quantity Purchased</label>
+                    <input type="number" id="quantity" placeholder="e.g., 500">
+                </div>
+                <div class="form-group half-width">
+                    <label for="quantity-unit-select">Unit</label>
+                    <select id="quantity-unit-select"></select>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <p style="font-weight: 600; margin-top: 0;">Adjustments (Optional)</p>
+                <div class="calc-grid">
+                    <div class="form-group half-width">
+                        <label>Item Discount</label>
+                        <div class="input-group">
+                            <input type="number" id="item-discount-value" placeholder="e.g., 10">
+                            <select id="item-discount-type">
+                                <option value="percent">%</option>
+                                <option value="fixed">Fixed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group half-width">
+                        <label>Item Tip</label>
+                         <div class="input-group">
+                            <input type="number" id="item-tip-value" placeholder="e.g., 2">
+                            <select id="item-tip-type">
+                                <option value="percent">%</option>
+                                <option value="fixed">Fixed</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calc-result">Calculated Price: <span id="calculated-price">--</span></div>
+            <div class="modal-buttons">
+                <button id="apply-calc-btn">Apply & Mark as Purchased</button>
+                <button id="close-modal-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const { jsPDF } = window.jspdf;
+
+        // --- DOM ELEMENTS ---
+        const listSelector = document.getElementById('list-selector');
+        const addListBtn = document.getElementById('add-list-btn');
+        const newListInput = document.getElementById('new-list-name');
+        const renameListBtn = document.getElementById('rename-list-btn');
+        const deleteListBtn = document.getElementById('delete-list-btn');
+        const currentListTitle = document.getElementById('current-list-title');
+
+        const addItemForm = document.getElementById('add-item-form');
+        const itemNameInput = document.getElementById('item-name');
+        const itemList = document.getElementById('item-list');
+        
+        const totalCashInput = document.getElementById('total-cash');
+        const currencySelect = document.getElementById('currency');
+        const lastUpdatedSpan = document.getElementById('last-updated');
+        const printBillBtn = document.getElementById('print-bill-btn');
+
+        // Summary Spans
+        const summarySubtotalSpan = document.getElementById('summary-subtotal');
+        const summaryDiscountsSpan = document.getElementById('summary-discounts');
+        const summarySubtotalAfterDiscountsSpan = document.getElementById('summary-subtotal-after-discounts');
+        const summaryTaxSpan = document.getElementById('summary-tax');
+        const summaryItemTipsSpan = document.getElementById('summary-item-tips');
+        const summaryGlobalTipSpan = document.getElementById('summary-global-tip');
+        const totalSpentSpan = document.getElementById('total-spent');
+        const moneyLeftSpan = document.getElementById('money-left');
+
+        // Adjustments Inputs
+        const adjustmentInputs = {
+            tax: { value: document.getElementById('tax-value'), type: document.getElementById('tax-type') },
+            discount: { value: document.getElementById('discount-value'), type: document.getElementById('discount-type') },
+            tip: { value: document.getElementById('tip-value'), type: document.getElementById('tip-type') },
+        };
+
+        // Modal Elements
+        const calcModal = document.getElementById('calc-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const applyCalcBtn = document.getElementById('apply-calc-btn');
+        const calcItemNameSpan = document.getElementById('calc-item-name');
+        const calcCategorySelect = document.getElementById('calc-category');
+        const pricePerUnitInput = document.getElementById('price-per-unit');
+        const priceUnitSelect = document.getElementById('price-unit-select');
+        const quantityInput = document.getElementById('quantity');
+        const quantityUnitSelect = document.getElementById('quantity-unit-select');
+        const calculatedPriceSpan = document.getElementById('calculated-price');
+        const itemDiscountValueInput = document.getElementById('item-discount-value');
+        const itemDiscountTypeSelect = document.getElementById('item-discount-type');
+        const itemTipValueInput = document.getElementById('item-tip-value');
+        const itemTipTypeSelect = document.getElementById('item-tip-type');
+        let currentCalcItemId = null;
+        
+        // --- STATE MANAGEMENT ---
+        let state = {};
+
+        const defaultState = {
+            lists: [{ 
+                id: Date.now(), 
+                name: "Groceries", 
+                items: [],
+                adjustments: {
+                    tax: { value: 0, type: 'percent' },
+                    discount: { value: 0, type: 'percent' },
+                    tip: { value: 0, type: 'percent' } // Global Tip
+                }
+            }],
+            activeListId: null,
+            settings: { totalCash: 0, currency: '₹' },
+            lastUpdated: null
+        };
+        
+        const defaultItem = {
+            id: 0, name: '', purchased: false, price: 0, breakdown: '',
+            discount: { value: 0, type: 'percent' },
+            tip: { value: 0, type: 'percent' }
+        };
+
+        // --- UNIT CONVERSION DATA ---
+        const units = {
+            mass: { 'kg': { name: 'Kilogram', to_base: 1 }, 'g': { name: 'Gram', to_base: 0.001 }, 'lb': { name: 'Pound', to_base: 0.453592 }, 'oz': { name: 'Ounce', to_base: 0.0283495 } },
+            volume: { 'L': { name: 'Liter', to_base: 1 }, 'ml': { name: 'Milliliter', to_base: 0.001 }, 'gal': { name: 'Gallon (US)', to_base: 3.78541 } },
+            length: { 'm': { name: 'Meter', to_base: 1 }, 'cm': { name: 'Centimeter', to_base: 0.01 }, 'ft': { name: 'Foot', to_base: 0.3048 }, 'in': { name: 'Inch', to_base: 0.0254 } },
+            pieces: { 'piece': { name: 'Piece', to_base: 1 } }
+        };
+
+        // --- FUNCTIONS ---
+        
+        const getActiveList = () => state.lists.find(l => l.id === state.activeListId);
+
+        const saveData = () => {
+            state.lastUpdated = new Date().toISOString();
+            localStorage.setItem('shoppingListData', JSON.stringify(state));
+            updateLastUpdated();
+        };
+
+        const loadData = () => {
+            const data = localStorage.getItem('shoppingListData');
+            state = data ? JSON.parse(data) : JSON.parse(JSON.stringify(defaultState));
+            
+            if (!state.lists || state.lists.length === 0) state.lists = defaultState.lists;
+            if (!state.activeListId || !state.lists.find(l => l.id === state.activeListId)) {
+                state.activeListId = state.lists[0].id;
+            }
+            // Backward compatibility for new properties
+            state.lists.forEach(list => {
+                if (!list.adjustments) list.adjustments = JSON.parse(JSON.stringify(defaultState.lists[0].adjustments));
+                list.items.forEach(item => {
+                    if (!item.discount) item.discount = { value: 0, type: 'percent' };
+                    if (!item.tip) item.tip = { value: 0, type: 'percent' };
+                });
+            });
+
+            totalCashInput.value = state.settings.totalCash || '';
+            currencySelect.value = state.settings.currency;
+            updateLastUpdated();
+        };
+
+        const updateLastUpdated = () => {
+            lastUpdatedSpan.textContent = state.lastUpdated ? `Last saved: ${new Date(state.lastUpdated).toLocaleString()}` : 'Not saved yet.';
+        };
+        
+        const calculateFinalBill = () => {
+            const activeList = getActiveList();
+            const result = { subtotal: 0, totalDiscount: 0, subtotalAfterDiscounts: 0, taxAmount: 0, itemTipsTotal: 0, globalTipAmount: 0, grandTotal: 0 };
+            if (!activeList) return result;
+
+            let itemDiscountsTotal = 0;
+            activeList.items.forEach(item => {
+                if (item.purchased) {
+                    result.subtotal += item.price;
+                    const discount = item.discount.type === 'percent' ? item.price * (item.discount.value / 100) : item.discount.value;
+                    itemDiscountsTotal += discount;
+                    const tip = item.tip.type === 'percent' ? item.price * (item.tip.value / 100) : item.tip.value;
+                    result.itemTipsTotal += tip;
+                }
+            });
+
+            const subtotalAfterItemDiscounts = result.subtotal - itemDiscountsTotal;
+            const adj = activeList.adjustments;
+            const globalDiscountAmount = adj.discount.type === 'percent' ? subtotalAfterItemDiscounts * (adj.discount.value / 100) : (parseFloat(adj.discount.value) || 0);
+            
+            result.totalDiscount = itemDiscountsTotal + globalDiscountAmount;
+            result.subtotalAfterDiscounts = result.subtotal - result.totalDiscount;
+
+            result.taxAmount = adj.tax.type === 'percent' ? result.subtotalAfterDiscounts * (adj.tax.value / 100) : (parseFloat(adj.tax.value) || 0);
+            const amountBeforeGlobalTip = result.subtotalAfterDiscounts + result.taxAmount;
+            result.globalTipAmount = adj.tip.type === 'percent' ? amountBeforeGlobalTip * (adj.tip.value / 100) : (parseFloat(adj.tip.value) || 0);
+            result.grandTotal = amountBeforeGlobalTip + result.itemTipsTotal + result.globalTipAmount;
+
+            return result;
+        };
+
+        const render = () => {
+            renderListSelector();
+            const activeList = getActiveList();
+            if (!activeList) {
+                itemList.innerHTML = '<li>No list selected. Please create or select a list.</li>';
+                currentListTitle.textContent = 'No Active List';
+                return;
+            }
+
+            currentListTitle.textContent = `Items for: ${activeList.name}`;
+            itemList.innerHTML = '';
+            activeList.items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = `list-item ${item.purchased ? 'purchased' : ''}`;
+                li.dataset.id = item.id;
+
+                const currency = state.settings.currency;
+                let priceDisplay = '';
+                let breakdownDisplay = item.breakdown || '';
+                if (item.purchased) {
+                    let finalItemPrice = item.price;
+                    let breakdownParts = [];
+                    if (item.discount && item.discount.value > 0) {
+                        const discountValue = item.discount.value;
+                        const discountType = item.discount.type === 'percent' ? '%' : '';
+                        const discountAmount = item.discount.type === 'percent' ? item.price * (discountValue / 100) : discountValue;
+                        finalItemPrice -= discountAmount;
+                        breakdownParts.push(`Disc: ${discountValue}${discountType}`);
+                    }
+                    if (item.tip && item.tip.value > 0) {
+                        const tipValue = item.tip.value;
+                        const tipType = item.tip.type === 'percent' ? '%' : currency;
+                         const tipAmount = item.tip.type === 'percent' ? item.price * (tipValue / 100) : tipValue;
+                        finalItemPrice += tipAmount;
+                        breakdownParts.push(`Tip: ${tipValue}${tipType}`);
+                    }
+                    if(breakdownParts.length > 0) breakdownDisplay += ` (${breakdownParts.join(', ')})`;
+                    priceDisplay = `${currency}${finalItemPrice.toFixed(2)}`;
+                }
+
+                li.innerHTML = `
+                    <div class="item-info">
+                        <span class="item-name">${item.name}</span>
+                        <div class="item-price-breakdown">${breakdownDisplay}</div>
+                    </div>
+                    <div class="item-price">${priceDisplay}</div>
+                    <div class="item-actions">
+                        <button class="purchase-btn">${item.purchased ? 'Undo' : 'Buy'}</button>
+                        <button class="calc-btn" title="Smart Calculation">&#x1F4BB;</button>
+                        <button class="delete-btn">&times;</button>
+                    </div>`;
+                itemList.appendChild(li);
+            });
+            
+            Object.keys(adjustmentInputs).forEach(key => {
+                adjustmentInputs[key].value.value = activeList.adjustments[key].value || '';
+                adjustmentInputs[key].type.value = activeList.adjustments[key].type;
+            });
+
+            updateSummary();
+            saveData();
+        };
+
+        const renderListSelector = () => {
+            listSelector.innerHTML = state.lists.map(list =>
+                `<option value="${list.id}" ${list.id === state.activeListId ? 'selected' : ''}>${list.name}</option>`
+            ).join('');
+        };
+
+        const updateSummary = () => {
+            const bill = calculateFinalBill();
+            const currency = state.settings.currency;
+            
+            summarySubtotalSpan.textContent = `${currency}${bill.subtotal.toFixed(2)}`;
+            summaryDiscountsSpan.textContent = `- ${currency}${bill.totalDiscount.toFixed(2)}`;
+            summarySubtotalAfterDiscountsSpan.textContent = `${currency}${bill.subtotalAfterDiscounts.toFixed(2)}`;
+            summaryTaxSpan.textContent = `+ ${currency}${bill.taxAmount.toFixed(2)}`;
+            summaryItemTipsSpan.textContent = `+ ${currency}${bill.itemTipsTotal.toFixed(2)}`;
+            summaryGlobalTipSpan.textContent = `+ ${currency}${bill.globalTipAmount.toFixed(2)}`;
+            totalSpentSpan.textContent = `${currency}${bill.grandTotal.toFixed(2)}`;
+            
+            const totalCash = parseFloat(state.settings.totalCash) || 0;
+            const moneyLeft = totalCash - bill.grandTotal;
+            moneyLeftSpan.textContent = `${currency}${moneyLeft.toFixed(2)}`;
+            moneyLeftSpan.className = moneyLeft < 0 ? 'due' : 'left';
+        };
+
+        // --- Event Handlers ---
+        
+        addListBtn.addEventListener('click', () => {
+            const name = newListInput.value.trim();
+            if (name) {
+                const newList = JSON.parse(JSON.stringify(defaultState.lists[0]));
+                newList.id = Date.now();
+                newList.name = name;
+                newList.items = [];
+                state.lists.push(newList);
+                state.activeListId = newList.id;
+                newListInput.value = '';
+                render();
+            }
+        });
+
+        listSelector.addEventListener('change', (e) => {
+            state.activeListId = parseInt(e.target.value);
+            render();
+        });
+
+        renameListBtn.addEventListener('click', () => {
+            const activeList = getActiveList();
+            if (!activeList) return;
+            const newName = prompt("Enter new name for the list:", activeList.name);
+            if (newName && newName.trim()) {
+                activeList.name = newName.trim();
+                render();
+            }
+        });
+
+        deleteListBtn.addEventListener('click', () => {
+            if (state.lists.length <= 1) {
+                alert("You cannot delete the last list.");
+                return;
+            }
+            const activeList = getActiveList();
+            if (activeList && confirm(`Are you sure you want to delete the list "${activeList.name}"?`)) {
+                state.lists = state.lists.filter(l => l.id !== state.activeListId);
+                state.activeListId = state.lists[0].id;
+                render();
+            }
+        });
+
+        addItemForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const activeList = getActiveList();
+            if (!activeList) return;
+            const name = itemNameInput.value.trim();
+            if (name) {
+                const newItem = JSON.parse(JSON.stringify(defaultItem));
+                newItem.id = Date.now();
+                newItem.name = name;
+                activeList.items.push(newItem);
+                itemNameInput.value = '';
+                render();
+            }
+        });
+        
+        itemList.addEventListener('click', (e) => {
+            const li = e.target.closest('.list-item');
+            if (!li) return;
+            const id = parseInt(li.dataset.id);
+            const item = getActiveList().items.find(i => i.id === id);
+
+            if (e.target.classList.contains('purchase-btn')) {
+                if (item.purchased) { // Undo
+                    Object.assign(item, JSON.parse(JSON.stringify(defaultItem)), {id: item.id, name: item.name});
+                } else { // Simple Buy
+                    const input = prompt(`Enter price for "${item.name}" (e.g., 90 or 30*3)`);
+                    if (input === null) return;
+                    try {
+                        // Sanitize and evaluate simple math
+                        const price = new Function('return ' + input.replace(/[^0-9.*/+-]/g, ''))();
+                        item.price = parseFloat(price);
+                        item.purchased = true;
+                        item.breakdown = input.match(/[*/]/) ? `${input} = ${state.settings.currency}${price.toFixed(2)}` : '';
+                    } catch { alert('Invalid price input.'); }
+                }
+                render();
+            } else if (e.target.classList.contains('delete-btn')) {
+                getActiveList().items = getActiveList().items.filter(i => i.id !== id);
+                render();
+            } else if (e.target.classList.contains('calc-btn')) {
+                openCalcModal(id);
+            }
+        });
+
+        totalCashInput.addEventListener('input', (e) => {
+            state.settings.totalCash = parseFloat(e.target.value) || 0;
+            updateSummary();
+            saveData();
+        });
+
+        currencySelect.addEventListener('change', (e) => {
+            state.settings.currency = e.target.value;
+            render();
+        });
+
+        Object.keys(adjustmentInputs).forEach(key => {
+            const { value, type } = adjustmentInputs[key];
+            const handler = () => {
+                const activeList = getActiveList();
+                if (activeList) {
+                    activeList.adjustments[key].value = parseFloat(value.value) || 0;
+                    activeList.adjustments[key].type = type.value;
+                    render();
+                }
+            };
+            value.addEventListener('input', handler);
+            type.addEventListener('change', handler);
+        });
+
+        // --- Smart Calculator Logic ---
+        const populateUnitSelects = () => {
+            const category = calcCategorySelect.value;
+            const unitData = units[category];
+            const options = Object.keys(unitData).map(key => `<option value="${key}">${key} (${unitData[key].name})</option>`).join('');
+            priceUnitSelect.innerHTML = options;
+            quantityUnitSelect.innerHTML = options;
+            calculateHelperPrice();
+        };
+
+        const openCalcModal = (id) => {
+            currentCalcItemId = id;
+            const item = getActiveList().items.find(i => i.id === id);
+            calcItemNameSpan.textContent = item.name;
+            // Clear inputs
+            [pricePerUnitInput, quantityInput, itemDiscountValueInput, itemTipValueInput].forEach(i => i.value = '');
+            itemDiscountTypeSelect.value = 'percent';
+            itemTipTypeSelect.value = 'percent';
+            populateUnitSelects();
+            calcModal.classList.remove('hidden');
+        };
+
+        const calculateHelperPrice = () => {
+            const priceVal = parseFloat(pricePerUnitInput.value);
+            const quantVal = parseFloat(quantityInput.value);
+            if (isNaN(priceVal) || isNaN(quantVal)) {
+                calculatedPriceSpan.textContent = '--';
+                return null;
+            }
+            const category = calcCategorySelect.value;
+            const priceUnit = priceUnitSelect.value;
+            const quantUnit = quantityUnitSelect.value;
+            const priceUnitToBase = units[category][priceUnit].to_base;
+            const quantUnitToBase = units[category][quantUnit].to_base;
+            const priceInBase = priceVal / priceUnitToBase;
+            const finalPrice = priceInBase * (quantVal * quantUnitToBase);
+            
+            calculatedPriceSpan.textContent = `${state.settings.currency}${finalPrice.toFixed(2)}`;
+            return {
+                price: finalPrice,
+                breakdown: `${state.settings.currency}${priceVal}/${priceUnit} × ${quantVal} ${quantUnit}`
+            };
+        };
+
+        calcCategorySelect.addEventListener('change', populateUnitSelects);
+        [pricePerUnitInput, priceUnitSelect, quantityInput, quantityUnitSelect].forEach(el => {
+            el.addEventListener('input', calculateHelperPrice);
+        });
+
+        applyCalcBtn.addEventListener('click', () => {
+            const result = calculateHelperPrice();
+            if (!result) {
+                alert("Please fill in price and quantity to calculate a base price.");
+                return;
+            }
+            if (currentCalcItemId) {
+                const item = getActiveList().items.find(i => i.id === currentCalcItemId);
+                if (item) {
+                    item.price = result.price;
+                    item.breakdown = result.breakdown;
+                    item.purchased = true;
+                    item.discount.value = parseFloat(itemDiscountValueInput.value) || 0;
+                    item.discount.type = itemDiscountTypeSelect.value;
+                    item.tip.value = parseFloat(itemTipValueInput.value) || 0;
+                    item.tip.type = itemTipTypeSelect.value;
+                    render();
+                }
+            }
+            calcModal.classList.add('hidden');
+        });
+        
+        closeModalBtn.addEventListener('click', () => calcModal.classList.add('hidden'));
+        calcModal.addEventListener('click', (e) => {
+            if (e.target === calcModal) calcModal.classList.add('hidden');
+        });
+
+        // --- PDF Printing ---
+        printBillBtn.addEventListener('click', () => {
+            const doc = new jsPDF();
+            const activeList = getActiveList();
+            if (!activeList) { alert("No active list to print."); return; }
+            
+            const billData = calculateFinalBill();
+            const currency = state.settings.currency;
+            let y = 20;
+
+            doc.setFontSize(22); doc.text("Shopping Bill", 105, y, { align: "center" });
+            y += 10;
+            doc.setFontSize(12); doc.text(`List: ${activeList.name}`, 105, y, { align: "center" });
+            y += 7; doc.text(`Date: ${new Date().toLocaleDateString()}`, 105, y, { align: "center" });
+            y += 15;
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Item", 15, y);
+            doc.text("Price", 95, y, { align: "right" });
+            doc.text("Discount", 125, y, { align: "right" });
+            doc.text("Tip", 150, y, { align: "right" });
+            doc.text("Final", 195, y, { align: "right" });
+            doc.setFont("helvetica", "normal");
+            y += 7; doc.line(15, y-2, 195, y-2);
+
+            const purchasedItems = activeList.items.filter(item => item.purchased);
+            if (purchasedItems.length === 0) {
+                doc.text("No items purchased yet.", 15, y); y += 7;
+            } else {
+                purchasedItems.forEach(item => {
+                    let itemDiscountAmount = item.discount.type === 'percent' ? item.price * (item.discount.value / 100) : item.discount.value;
+                    let itemTipAmount = item.tip.type === 'percent' ? item.price * (item.tip.value / 100) : item.tip.value;
+                    const finalItemPrice = item.price - itemDiscountAmount + itemTipAmount;
+
+                    doc.text(item.name.length > 30 ? item.name.substring(0, 27) + '...' : item.name, 15, y);
+                    doc.text(`${currency}${item.price.toFixed(2)}`, 95, y, { align: "right" });
+                    doc.text(`-${currency}${itemDiscountAmount.toFixed(2)}`, 125, y, { align: "right" });
+                    doc.text(`+${currency}${itemTipAmount.toFixed(2)}`, 150, y, { align: "right" });
+                    doc.text(`${currency}${finalItemPrice.toFixed(2)}`, 195, y, { align: "right" });
+                    y += 7;
+                });
+            }
+            
+            y += 5; doc.line(110, y, 195, y); y += 7;
+
+            const printSummaryLine = (label, value, sign = '+') => {
+                 if (value !== 0 || label.includes("Total")) {
+                    doc.text(label, 150, y, { align: "right" });
+                    const valStr = (label.includes("Total") ? '' : sign) + ` ${currency}${Math.abs(value).toFixed(2)}`;
+                    doc.text(valStr, 195, y, { align: "right" });
+                    y += 7;
+                }
+            };
+            
+            printSummaryLine("Subtotal", billData.subtotal, ' ');
+            printSummaryLine("Discounts", billData.totalDiscount, '-');
+            printSummaryLine("Tax", billData.taxAmount, '+');
+            printSummaryLine("Item Tips", billData.itemTipsTotal, '+');
+            printSummaryLine("Global Tip", billData.globalTipAmount, '+');
+            y += 2; doc.line(110, y, 195, y); y += 7;
+            doc.setFont("helvetica", "bold");
+            printSummaryLine("Grand Total", billData.grandTotal, ' ');
+            
+            doc.save(`${activeList.name.replace(/\s/g, '_')}-bill.pdf`);
+        });
+
+        // --- INITIALIZATION ---
+        loadData();
+        render();
+    });
+    </script>
+</body>
+</html>
